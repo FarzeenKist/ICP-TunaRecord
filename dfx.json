@@ -1,0 +1,13 @@
+{
+  "canisters": {
+    "tuna_record": {
+      "main": "src/index.ts",
+      "type": "custom",
+      "build": "npx azle tuna_record",
+      "root": "src",
+      "ts": "src/index.ts",
+      "candid": "src/index.did",
+      "wasm": ".azle/tuna_record/tuna_record.wasm.gz"
+    }
+  }
+}
