@@ -27,4 +27,4 @@ npm run down
 * npm run deploy -- deploy the canister to local node.
 * npm run down -- stop local node.
 
-### [Feel Free to give me feedback on Dacade.](https://dacade.org/communities/icp/courses/typescript-smart-contract-101/challenges/256f0a1c-5f4f-495f-a1b3-90559ab3c51f/submissions/eece2947-16cd-4231-9d1b-9183161d2a9d)
+### [Feel free to give me feedback on Dacade.](https://dacade.org/communities/icp/courses/typescript-smart-contract-101/challenges/256f0a1c-5f4f-495f-a1b3-90559ab3c51f/submissions/eece2947-16cd-4231-9d1b-9183161d2a9d)
