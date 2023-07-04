@@ -1,10 +1,6 @@
 import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt } from 'azle';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * This type represents a tuna record that can be listed on a ledger.
- */
-
 type TunaRecord = Record<{
     id: string;
     vessel: string;
@@ -22,13 +18,11 @@ type TunaPayload = Record<{
 
 const tunaRecordStorage = new StableBTreeMap<string, TunaRecord>(0, 44, 1024);
 
-// https://github.com/hyperledger-archives/education/blob/master/LFS171x/fabric-material/chaincode/tuna-app/tuna-chaincode.go#L81
-
 $query;
 export function queryTuna(id: string): Result<TunaRecord, string> {
     return match(tunaRecordStorage.get(id), {
         Some: (tunaRecord) => Result.Ok<TunaRecord, string>(tunaRecord),
-        None: () => Result.Err<TunaRecord, string>(`a tuna record with id=${id} not found`)
+        None: () => Result.Err<TunaRecord, string>(`A tuna record with id=${id} not found`)
     });
 }
 
@@ -37,11 +31,17 @@ export function queryAllTuna(): Result<Vec<TunaRecord>, string> {
     return Result.Ok(tunaRecordStorage.values());
 }
 
+$query;
+export function searchTunaByHolder(holder: string): Result<Vec<TunaRecord>, string> {
+    const filteredTuna = tunaRecordStorage.values().filter((tuna) => tuna.holder === holder);
+    return Result.Ok(filteredTuna);
+}
+
 $update;
 export function deleteTunaRecord(id: string): Result<TunaRecord, string> {
     return match(tunaRecordStorage.remove(id), {
         Some: (deletedTuna) => Result.Ok<TunaRecord, string>(deletedTuna),
-        None: () => Result.Err<TunaRecord, string>(`couldn't delete a tuna record with id=${id}. tuna record not found.`)
+        None: () => Result.Err<TunaRecord, string>(`Couldn't delete a tuna record with id=${id}. Tuna record not found.`)
     });
 }
 
@@ -60,19 +60,40 @@ export function changeTunaHolder(id: string, holder: string): Result<TunaRecord,
             tunaRecordStorage.insert(tunaRecord.id, updatedTuna);
             return Result.Ok<TunaRecord, string>(updatedTuna);
         },
-        None: () => Result.Err<TunaRecord, string>(`couldn't update a tuna record with id=${id}. tuna record not found`)
+        None: () => Result.Err<TunaRecord, string>(`Couldn't update a tuna record with id=${id}. Tuna record not found`)
     });
 }
 
-// a workaround to make uuid package work with Azle
+$query;
+export function getTunaByCreationDate(): Result<Vec<TunaRecord>, string> {
+    const sortedTuna = tunaRecordStorage.values().sort((a, b) => a.createdAt - b.createdAt);
+    return Result.Ok(sortedTuna);
+}
+
+$query;
+export function countTunaByVessel(): Result<Record<string, number>, string> {
+    const vesselCount: Record<string, number> = {};
+    const tunaRecords = tunaRecordStorage.values();
+
+    for (const tuna of tunaRecords) {
+        if (vesselCount[tuna.vessel]) {
+            vesselCount[tuna.vessel]++;
+        } else {
+            vesselCount[tuna.vessel] = 1;
+        }
+    }
+
+    return Result.Ok(vesselCount);
+}
+
 globalThis.crypto = {
     getRandomValues: () => {
-        let array = new Uint8Array(32)
+        let array = new Uint8Array(32);
 
         for (let i = 0; i < array.length; i++) {
-            array[i] = Math.floor(Math.random() * 256)
+            array[i] = Math.floor(Math.random() * 256);
         }
 
-        return array
+        return array;
     }
 }
