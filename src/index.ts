@@ -1,4 +1,4 @@
-import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt } from 'azle';
+import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt, nat8, Principal, $init } from 'azle';
 import { v4 as uuidv4 } from 'uuid';
 
 type TunaRecord = Record<{
@@ -16,7 +16,58 @@ type TunaPayload = Record<{
     holder: string;
 }>
 
+let adminAccount : Principal;
+let memberCount : nat8;
+const trustedMembers = new StableBTreeMap<nat8,Principal>(1,44,1024);
+
+
 const tunaRecordStorage = new StableBTreeMap<string, TunaRecord>(0, 44, 1024);
+
+
+$init;
+export function init(admin : string) : void{
+    adminAccount= Principal.fromText(admin)
+}
+
+
+$update;
+export function addMember(member : string) : Result<nat8,string>{
+    const caller = ic.caller();
+    if(caller !== adminAccount){
+        return Result.Err<nat8,string>("Only the admin can add trusted members")
+    }
+    memberCount= (memberCount+1)
+    trustedMembers.insert(memberCount,Principal.fromText(member))
+    return Result.Ok<nat8,string>(memberCount);
+}
+
+//delete member
+
+$update;
+export function deleteMember(id: nat8) : Result<string,string>{
+    const caller = ic.caller();
+    if(caller !== adminAccount){
+        return Result.Err<string,string>("Only the admin can delete trusted members")
+    }
+
+    return match(trustedMembers.remove(id),{
+        None:()=> Result.Err<string,string>(`Member with id=${id} cannot be found`),
+        Some:(deletedMember)=> Result.Ok<string,string>("Member deleted successfully")
+    });
+}
+
+
+$query;
+export function isMember(id : string) : boolean{
+    return trustedMembers.values().includes(Principal.fromText(id))
+}
+
+
+$query;
+export function getAllTrustedMembers() : Vec<Principal>{
+    return Array.from(trustedMembers.values());
+}
+
 
 $query;
 export function queryTuna(id: string): Result<TunaRecord, string> {
@@ -39,21 +90,34 @@ export function searchTunaByHolder(holder: string): Result<Vec<TunaRecord>, stri
 
 $update;
 export function deleteTunaRecord(id: string): Result<TunaRecord, string> {
+const caller = ic.caller();
+if(caller === adminAccount || isMember(caller.toString())){
+
     return match(tunaRecordStorage.remove(id), {
         Some: (deletedTuna) => Result.Ok<TunaRecord, string>(deletedTuna),
         None: () => Result.Err<TunaRecord, string>(`Couldn't delete a tuna record with id=${id}. Tuna record not found.`)
     });
 }
+return Result.Err<TunaRecord,string>("You are not authorized")
+}
+
 
 $update;
 export function recordTuna(payload: TunaPayload): Result<TunaRecord, string> {
+
+    const caller = ic.caller();
+    if(caller === adminAccount || isMember(caller.toString())){
     const tunaRecord: TunaRecord = { id: uuidv4(), createdAt: ic.time(), updatedAt: Opt.None, ...payload };
     tunaRecordStorage.insert(tunaRecord.id, tunaRecord);
     return Result.Ok(tunaRecord);
+    }
+    return Result.Err<TunaRecord,string>("You are not authorized")
 }
 
 $update;
 export function changeTunaHolder(id: string, holder: string): Result<TunaRecord, string> {
+    const caller = ic.caller();
+    if(caller === adminAccount || isMember(caller.toString())){
     return match(tunaRecordStorage.get(id), {
         Some: (tunaRecord) => {
             const updatedTuna: TunaRecord = {...tunaRecord, holder: holder, updatedAt: Opt.Some(ic.time())};
@@ -62,6 +126,8 @@ export function changeTunaHolder(id: string, holder: string): Result<TunaRecord,
         },
         None: () => Result.Err<TunaRecord, string>(`Couldn't update a tuna record with id=${id}. Tuna record not found`)
     });
+}
+return Result.Err<TunaRecord,string>("You are not authorized")
 }
 
 $query;
