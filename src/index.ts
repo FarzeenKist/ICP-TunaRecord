@@ -16,6 +16,7 @@ type TunaPayload = Record<{
     holder: string;
 }>
 
+
 let adminAccount : Principal;
 let memberCount : nat8;
 const trustedMembers = new StableBTreeMap<nat8,Principal>(1,44,1024);
@@ -30,10 +31,12 @@ export function init(admin : string) : void{
 }
 
 
+// Function that allows the admin to add members to the platform
 $update;
 export function addMember(member : string) : Result<nat8,string>{
     const caller = ic.caller();
-    if(caller !== adminAccount){
+    // return an error if caller isn't the admin
+    if(caller.toString() !== adminAccount.toString()){
         return Result.Err<nat8,string>("Only the admin can add trusted members")
     }
     memberCount= (memberCount+1)
@@ -41,12 +44,12 @@ export function addMember(member : string) : Result<nat8,string>{
     return Result.Ok<nat8,string>(memberCount);
 }
 
-//delete member
-
+// Function that allows the admin to remove members from the platform
 $update;
 export function deleteMember(id: nat8) : Result<string,string>{
     const caller = ic.caller();
-    if(caller !== adminAccount){
+    // return an error if caller isn't the admin
+    if(caller.toString() !== adminAccount.toString()){
         return Result.Err<string,string>("Only the admin can delete trusted members")
     }
 
@@ -56,19 +59,19 @@ export function deleteMember(id: nat8) : Result<string,string>{
     });
 }
 
-
+// Function that returns a boolean value about whether a user is a member of the platform
 $query;
-export function isMember(id : string) : boolean{
-    return trustedMembers.values().includes(Principal.fromText(id))
+export function isMember(id : Principal) : boolean{
+    return trustedMembers.values().includes(id)
 }
 
-
+// Function that returns all members of the platform
 $query;
 export function getAllTrustedMembers() : Vec<Principal>{
     return Array.from(trustedMembers.values());
 }
 
-
+// Function that returns a specific TunaRecord with id
 $query;
 export function queryTuna(id: string): Result<TunaRecord, string> {
     return match(tunaRecordStorage.get(id), {
@@ -76,22 +79,28 @@ export function queryTuna(id: string): Result<TunaRecord, string> {
         None: () => Result.Err<TunaRecord, string>(`A tuna record with id=${id} not found`)
     });
 }
-
+// Function that returns an array of all TunaRecords
 $query;
 export function queryAllTuna(): Result<Vec<TunaRecord>, string> {
     return Result.Ok(tunaRecordStorage.values());
 }
 
+// Function that returns an array of all TunaRecords of a specific holder
 $query;
 export function searchTunaByHolder(holder: string): Result<Vec<TunaRecord>, string> {
+    if(tunaRecordStorage.isEmpty()){
+        return Result.Err<Vec<TunaRecord>, string>("There are currently no tuna records");
+    }
     const filteredTuna = tunaRecordStorage.values().filter((tuna) => tuna.holder === holder);
     return Result.Ok(filteredTuna);
 }
 
+// Function that allows the admin or members of the platform to delete a TunaRecord from the state
 $update;
 export function deleteTunaRecord(id: string): Result<TunaRecord, string> {
 const caller = ic.caller();
-if(caller === adminAccount || isMember(caller.toString())){
+// Delete the TunaRecord only if caller is the admin or a member of the platform
+if(caller.toString() === adminAccount.toString() || isMember(caller)){
 
     return match(tunaRecordStorage.remove(id), {
         Some: (deletedTuna) => Result.Ok<TunaRecord, string>(deletedTuna),
@@ -101,12 +110,13 @@ if(caller === adminAccount || isMember(caller.toString())){
 return Result.Err<TunaRecord,string>("You are not authorized")
 }
 
-
+// Function that allows the admin or members of the platform to add  and save a TunaRecord to the state
 $update;
 export function recordTuna(payload: TunaPayload): Result<TunaRecord, string> {
 
     const caller = ic.caller();
-    if(caller === adminAccount || isMember(caller.toString())){
+    // add the TunaRecord only if caller is the admin or a member of the platform
+    if(caller.toString() === adminAccount.toString() || isMember(caller)){
     const tunaRecord: TunaRecord = { id: uuidv4(), createdAt: ic.time(), updatedAt: Opt.None, ...payload };
     tunaRecordStorage.insert(tunaRecord.id, tunaRecord);
     return Result.Ok(tunaRecord);
@@ -114,10 +124,12 @@ export function recordTuna(payload: TunaPayload): Result<TunaRecord, string> {
     return Result.Err<TunaRecord,string>("You are not authorized")
 }
 
+// Function that allows the admin or members of the platform to change the holder of a specific TunaRecord
 $update;
 export function changeTunaHolder(id: string, holder: string): Result<TunaRecord, string> {
     const caller = ic.caller();
-    if(caller === adminAccount || isMember(caller.toString())){
+    // change the holder of the TunaRecord only if caller is the admin or a member of the platform
+    if(caller.toString() === adminAccount.toString() || isMember(caller)){
     return match(tunaRecordStorage.get(id), {
         Some: (tunaRecord) => {
             const updatedTuna: TunaRecord = {...tunaRecord, holder: holder, updatedAt: Opt.Some(ic.time())};
@@ -130,27 +142,17 @@ export function changeTunaHolder(id: string, holder: string): Result<TunaRecord,
 return Result.Err<TunaRecord,string>("You are not authorized")
 }
 
+// Function that returns a sorted by date array of TunaRecords
 $query;
 export function getTunaByCreationDate(): Result<Vec<TunaRecord>, string> {
-    const sortedTuna = tunaRecordStorage.values().sort((a, b) => a.createdAt - b.createdAt);
+    if(tunaRecordStorage.isEmpty()){
+        return Result.Err<Vec<TunaRecord>, string>("There are currently no tuna records");
+    }
+    const sortedTuna = tunaRecordStorage.values().sort((a, b) => Number(a.createdAt - b.createdAt));
     return Result.Ok(sortedTuna);
 }
 
-$query;
-export function countTunaByVessel(): Result<Record<string, number>, string> {
-    const vesselCount: Record<string, number> = {};
-    const tunaRecords = tunaRecordStorage.values();
 
-    for (const tuna of tunaRecords) {
-        if (vesselCount[tuna.vessel]) {
-            vesselCount[tuna.vessel]++;
-        } else {
-            vesselCount[tuna.vessel] = 1;
-        }
-    }
-
-    return Result.Ok(vesselCount);
-}
 
 globalThis.crypto = {
     getRandomValues: () => {
