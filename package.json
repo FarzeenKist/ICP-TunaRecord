@@ -7,12 +7,13 @@
     "up": "dfx start --background",
     "down": "dfx stop",
     "up-clean": "dfx start --background --clean",
-    "deploy": "dfx deploy",
+    "deploy": "dfx deploy --argument '(\"aaaaa-aa\")' tuna_record",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@dfinity/agent": "^0.15.6",
     "@dfinity/candid": "^0.15.6",
+    "@dfinity/principal": "^0.15.6",
     "azle": "0.16.2",
     "uuid": "^9.0.0"
   },
